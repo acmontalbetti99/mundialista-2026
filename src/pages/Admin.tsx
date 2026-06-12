@@ -86,6 +86,14 @@ function AdminMatches({ lang, t }: { lang: 'es' | 'en'; t: Translations }) {
   const teamMap = new Map(teams.map((t) => [t.id, t]));
 
   async function saveScore(match: Match, home: number | null, away: number | null) {
+    console.log('saveScore called with match:', match);
+
+    if (!match.id) {
+      console.error('saveScore: match.id is missing!', match);
+      alert(`Error interno: el partido no tiene ID. match_number=${match.match_number}`);
+      return;
+    }
+
     const { data, error } = await supabase
       .from('matches')
       .update({ home_score: home, away_score: away })
