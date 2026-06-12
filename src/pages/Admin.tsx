@@ -86,10 +86,22 @@ function AdminMatches({ lang, t }: { lang: 'es' | 'en'; t: Translations }) {
   const teamMap = new Map(teams.map((t) => [t.id, t]));
 
   async function saveScore(match: Match, home: number | null, away: number | null) {
-    await supabase
+    const { data, error } = await supabase
       .from('matches')
       .update({ home_score: home, away_score: away })
-      .eq('id', match.id);
+      .eq('id', match.id)
+      .select();
+
+    if (error) {
+      console.error('saveScore error:', error);
+      alert(`No se pudo guardar: ${error.message}`);
+      return;
+    }
+    if (!data || data.length === 0) {
+      console.warn('saveScore: update affected 0 rows. Likely an RLS/permission issue.');
+      alert('No se guardó el resultado. Revisa que tengas permisos de admin.');
+      return;
+    }
     await reload();
   }
 
@@ -240,6 +252,22 @@ function AdminMatchRow({
 }) {
   const [h, setH] = useState(match.home_score?.toString() ?? '');
   const [a, setA] = useState(match.away_score?.toString() ?? '');
+  const [savingState, setSavingState] = useState<'idle' | 'saving' | 'saved'>('idle');
+
+  async function handleSave() {
+    setSavingState('saving');
+    try {
+      await onSaveScore(
+        h === '' ? null : parseInt(h, 10),
+        a === '' ? null : parseInt(a, 10)
+      );
+      setSavingState('saved');
+      setTimeout(() => setSavingState('idle'), 2000);
+    } catch (err) {
+      console.error(err);
+      setSavingState('idle');
+    }
+  }
 
   return (
     <div className="card p-4 flex items-center gap-3 flex-wrap">
@@ -272,10 +300,11 @@ function AdminMatchRow({
           className="w-14 input-text text-center"
         />
         <button
-          onClick={() => onSaveScore(h === '' ? null : parseInt(h, 10), a === '' ? null : parseInt(a, 10))}
+          onClick={handleSave}
+          disabled={savingState === 'saving'}
           className="btn-primary text-xs px-3 py-1.5"
         >
-          {t.admin.save}
+          {savingState === 'saving' ? '⋯' : savingState === 'saved' ? '✓' : t.admin.save}
         </button>
         <button onClick={onDelete} className="text-cup-red text-xs px-2">✕</button>
       </div>
